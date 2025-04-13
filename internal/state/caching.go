@@ -6,12 +6,16 @@ import (
 	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
+	gethState "github.com/ethereum/go-ethereum/core/state"
+	"github.com/ethereum/go-ethereum/core/stateless"
+	"github.com/ethereum/go-ethereum/core/tracing"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/ethereum/go-ethereum/trie/utils"
 	"github.com/holiman/uint256"
 )
 
@@ -164,7 +168,7 @@ func (db *CachingStateDB) GetNonce(addr common.Address) uint64 {
 	return nonce
 }
 
-func (db *CachingStateDB) SubBalance(addr common.Address, amount *uint256.Int) {
+func (db *CachingStateDB) SubBalance(addr common.Address, amount *uint256.Int, _ tracing.BalanceChangeReason) uint256.Int {
 	stateDiff := db.getStateDiff(addr)
 
 	balanceBefore := db.GetBalance(addr)
@@ -179,9 +183,10 @@ func (db *CachingStateDB) SubBalance(addr common.Address, amount *uint256.Int) {
 
 	db.diffs[addr] = stateDiff
 	db.cache.Store(getBalanceCacheKey(addr), stateDiff.BalanceAfter)
+	return *stateDiff.BalanceAfter
 }
 
-func (db *CachingStateDB) AddBalance(addr common.Address, amount *uint256.Int) {
+func (db *CachingStateDB) AddBalance(addr common.Address, amount *uint256.Int, _ tracing.BalanceChangeReason) uint256.Int {
 	stateDiff := db.getStateDiff(addr)
 
 	balanceBefore := db.GetBalance(addr)
@@ -196,10 +201,11 @@ func (db *CachingStateDB) AddBalance(addr common.Address, amount *uint256.Int) {
 
 	db.diffs[addr] = stateDiff
 	db.cache.Store(getBalanceCacheKey(addr), stateDiff.BalanceAfter)
+	return *stateDiff.BalanceAfter
 }
 
 // SetState tracks state changes
-func (db *CachingStateDB) SetState(addr common.Address, key, value common.Hash) {
+func (db *CachingStateDB) SetState(addr common.Address, key, value common.Hash) common.Hash {
 	stateDiff := db.getStateDiff(addr)
 	storageDiff := stateDiff.getStorageDiff(key)
 
@@ -212,10 +218,11 @@ func (db *CachingStateDB) SetState(addr common.Address, key, value common.Hash) 
 	stateDiff.StorageDiffs[key] = storageDiff
 	db.diffs[addr] = stateDiff
 	db.cache.Store(getStorageCacheKey(addr, key), value)
+	return value
 }
 
 // SetNonce tracks state changes
-func (db *CachingStateDB) SetNonce(addr common.Address, nonce uint64) {
+func (db *CachingStateDB) SetNonce(addr common.Address, nonce uint64, _ tracing.NonceChangeReason) {
 	stateDiff := db.getStateDiff(addr)
 
 	nonceBefore := db.GetNonce(addr)
@@ -295,7 +302,9 @@ func (db *CachingStateDB) Prepare(rules params.Rules, sender, coinbase common.Ad
 }
 
 // Selfdestruct6780 implements the EIP-6780 selfdestruct behavior
-func (db *CachingStateDB) Selfdestruct6780(addr common.Address) {}
+func (db *CachingStateDB) SelfDestruct6780(addr common.Address) (uint256.Int, bool) {
+	return *uint256.NewInt(0), false
+}
 
 // SetTransientState sets the transient state for an address and key
 func (db *CachingStateDB) SetTransientState(addr common.Address, key, value common.Hash) {}
@@ -314,19 +323,44 @@ func (db *CachingStateDB) GetRefund() uint64                         { return 0 
 func (db *CachingStateDB) GetCommittedState(common.Address, common.Hash) common.Hash {
 	return common.Hash{}
 }
-func (db *CachingStateDB) SetCode(common.Address, []byte) {
+func (db *CachingStateDB) SetCode(common.Address, []byte) []byte {
 	fmt.Println("SetCode")
+	return nil
 }
-func (db *CachingStateDB) AddRefund(uint64)                      {}
-func (db *CachingStateDB) SubRefund(uint64)                      {}
-func (db *CachingStateDB) SelfDestruct(common.Address)           {}
-func (db *CachingStateDB) HasSelfDestructed(common.Address) bool { return false }
-func (db *CachingStateDB) Exist(common.Address) bool             { return true }
-func (db *CachingStateDB) Empty(common.Address) bool             { return false }
-func (db *CachingStateDB) RevertToSnapshot(int)                  {}
-func (db *CachingStateDB) Snapshot() int                         { return 0 }
-func (db *CachingStateDB) AddLog(*types.Log)                     {}
-func (db *CachingStateDB) AddPreimage(common.Hash, []byte)       {}
+func (db *CachingStateDB) AddRefund(uint64)                        {}
+func (db *CachingStateDB) SubRefund(uint64)                        {}
+func (db *CachingStateDB) SelfDestruct(common.Address) uint256.Int { return *uint256.NewInt(0) }
+func (db *CachingStateDB) HasSelfDestructed(common.Address) bool   { return false }
+func (db *CachingStateDB) Exist(common.Address) bool               { return true }
+func (db *CachingStateDB) Empty(common.Address) bool               { return false }
+func (db *CachingStateDB) RevertToSnapshot(int)                    {}
+func (db *CachingStateDB) Snapshot() int                           { return 0 }
+func (db *CachingStateDB) AddLog(*types.Log)                       {}
+func (db *CachingStateDB) AddPreimage(common.Hash, []byte)         {}
 func (db *CachingStateDB) ForEachStorage(common.Address, func(common.Hash, common.Hash) bool) error {
+	return nil
+}
+
+func (db *CachingStateDB) AccessEvents() *gethState.AccessEvents {
+	return nil
+}
+
+func (db *CachingStateDB) CreateContract(addr common.Address) {
+	// No-op for our caching implementation
+}
+
+func (db *CachingStateDB) Finalise(deleteEmptyObjects bool) {
+	// No-op for our caching implementation
+}
+
+func (db *CachingStateDB) GetStorageRoot(addr common.Address) common.Hash {
+	return common.Hash{}
+}
+
+func (db *CachingStateDB) PointCache() *utils.PointCache {
+	return nil
+}
+
+func (db *CachingStateDB) Witness() *stateless.Witness {
 	return nil
 }

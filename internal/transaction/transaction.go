@@ -5,6 +5,7 @@ import (
 
 	"github.com/base/validation-generator/internal/state"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/tracing"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/holiman/uint256"
@@ -22,10 +23,10 @@ func SimulateTransaction(evm *vm.EVM, tx *types.Transaction, from common.Address
 
 	// Get current nonce and increment it
 	currentNonce := statedb.GetNonce(from)
-	statedb.SetNonce(from, currentNonce+1)
+	statedb.SetNonce(from, currentNonce+1, tracing.NonceChangeUnspecified)
 
 	// Execute the transaction
-	_, _, err := evm.Call(vm.AccountRef(from), to, tx.Data(), tx.Gas(), value)
+	_, _, err := evm.Call(from, to, tx.Data(), tx.Gas(), value)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute transaction: %v", err)
 	}

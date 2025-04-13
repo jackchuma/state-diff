@@ -96,16 +96,30 @@ func loadConfig() (*Config, error) {
 	return &config, nil
 }
 
-func BuildValidationFile(chainId string, diffs []state.StateDiff) ([]byte, error) {
+func BuildValidationFile(chainId, safe string, diffs []state.StateDiff, domainHash, messageHash []byte) ([]byte, error) {
 	cfg, err := loadConfig()
 	if err != nil {
 		fmt.Printf("Error loading config: %v\n", err)
 		return nil, err
 	}
 
-	template := []byte(starterTemplate)
+	template := handleMessageIdentifiers(chainId, safe, domainHash, messageHash, cfg)
 	template = handleStateChanges(chainId, template, diffs, cfg)
 	return template, nil
+}
+
+func handleMessageIdentifiers(chainId, safe string, domainHash, messageHash []byte, cfg *Config) []byte {
+	var messageIdentifiers string
+
+	contract := getContractCfg(cfg, chainId, safe)
+
+	messageIdentifiers += fmt.Sprintf("> ### %s: `%s`\n", contract.Name, safe)
+	messageIdentifiers += ">\n"
+	messageIdentifiers += fmt.Sprintf("> - Domain Hash: `0x%x`\n", domainHash)
+	messageIdentifiers += fmt.Sprintf("> - Message Hash: `0x%x`\n", messageHash)
+	messageIdentifiers += ">\n"
+
+	return []byte(strings.Replace(starterTemplate, "<<MessageIdentifiers>>", strings.TrimSuffix(messageIdentifiers, "\n>\n"), 1))
 }
 
 func handleStateChanges(chainId string, template []byte, changes []state.StateDiff, cfg *Config) []byte {
