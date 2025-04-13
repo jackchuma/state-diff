@@ -315,11 +315,10 @@ func (db *CachingStateDB) SlotInAccessList(addr common.Address, slot common.Hash
 }
 
 // Required vm.StateDB interface methods that we don't need to implement for simulation
-func (db *CachingStateDB) CreateAccount(common.Address)              {}
-func (db *CachingStateDB) GetAddressHash(common.Address) common.Hash { return common.Hash{} }
-func (db *CachingStateDB) GetCodeHash(common.Address) common.Hash    { return common.Hash{} }
-func (db *CachingStateDB) GetCodeSize(common.Address) int            { return 0 }
-func (db *CachingStateDB) GetRefund() uint64                         { return 0 }
+func (db *CachingStateDB) CreateAccount(common.Address)           {}
+func (db *CachingStateDB) GetCodeHash(common.Address) common.Hash { return common.Hash{} }
+func (db *CachingStateDB) GetCodeSize(common.Address) int         { return 0 }
+func (db *CachingStateDB) GetRefund() uint64                      { return 0 }
 func (db *CachingStateDB) GetCommittedState(common.Address, common.Hash) common.Hash {
 	return common.Hash{}
 }
@@ -337,9 +336,6 @@ func (db *CachingStateDB) RevertToSnapshot(int)                    {}
 func (db *CachingStateDB) Snapshot() int                           { return 0 }
 func (db *CachingStateDB) AddLog(*types.Log)                       {}
 func (db *CachingStateDB) AddPreimage(common.Hash, []byte)         {}
-func (db *CachingStateDB) ForEachStorage(common.Address, func(common.Hash, common.Hash) bool) error {
-	return nil
-}
 
 func (db *CachingStateDB) AccessEvents() *gethState.AccessEvents {
 	return nil
