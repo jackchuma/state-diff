@@ -96,7 +96,7 @@ func loadConfig() (*Config, error) {
 	return &config, nil
 }
 
-func BuildValidationFile(chainId, safe string, diffs []state.StateDiff, domainHash, messageHash []byte) ([]byte, error) {
+func BuildValidationFile(chainId, safe string, overrides []state.Override, diffs []state.StateDiff, domainHash, messageHash []byte) ([]byte, error) {
 	cfg, err := loadConfig()
 	if err != nil {
 		fmt.Printf("Error loading config: %v\n", err)
@@ -104,6 +104,7 @@ func BuildValidationFile(chainId, safe string, diffs []state.StateDiff, domainHa
 	}
 
 	template := handleMessageIdentifiers(chainId, safe, domainHash, messageHash, cfg)
+	template = handleStateOverrides(chainId, template, overrides, cfg)
 	template = handleStateChanges(chainId, template, diffs, cfg)
 	return template, nil
 }
@@ -120,6 +121,46 @@ func handleMessageIdentifiers(chainId, safe string, domainHash, messageHash []by
 	messageIdentifiers += ">\n"
 
 	return []byte(strings.Replace(starterTemplate, "<<MessageIdentifiers>>", strings.TrimSuffix(messageIdentifiers, "\n>\n"), 1))
+}
+
+func handleStateOverrides(chainId string, template []byte, overrides []state.Override, cfg *Config) []byte {
+	var stateOverrides string
+	counter := 0
+
+	for _, override := range overrides {
+		contract := getContractCfg(cfg, chainId, override.ContractAddress.Hex())
+
+		for _, storageOverride := range override.Storage {
+			slot := getSlot(&contract, storageOverride.Key.Hex())
+
+			stateOverrides += fmt.Sprintf("- **Address**: `%s` <br/>\n", override.ContractAddress.Hex())
+			stateOverrides += fmt.Sprintf("  **Key**: `%s` <br/>\n", storageOverride.Key.Hex())
+			stateOverrides += fmt.Sprintf("  **Override**: `%s` <br/>\n", storageOverride.Value.Hex())
+			stateOverrides += fmt.Sprintf("  **Meaning**: %s\n", slot.OverrideMeaning)
+
+			counter++
+		}
+	}
+
+	stateOverrides = strings.TrimSuffix(stateOverrides, "\n")
+
+	template = []byte(strings.Replace(string(template), "<<StateOverrides>>", stateOverrides, 1))
+
+	if counter > 0 {
+		template = []byte(strings.Replace(string(template), "<<StartStateOverrides>>\n\n", "", 1))
+		template = []byte(strings.Replace(string(template), "<<EndStateOverrides>>\n\n", "", 1))
+	} else {
+		// remove everything between <<StartStateOverrides>> and <<EndStateOverrides>>
+		startKey := "<<StartStateOverrides>>\n\n"
+		endKey := "<<EndStateOverrides>>\n\n"
+
+		startIdx := strings.Index(string(template), startKey)
+		endIdx := strings.Index(string(template), endKey)
+
+		template = append(template[:startIdx], template[endIdx+len(endKey):]...)
+	}
+
+	return template
 }
 
 func handleStateChanges(chainId string, template []byte, changes []state.StateDiff, cfg *Config) []byte {

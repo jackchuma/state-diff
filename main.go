@@ -115,10 +115,13 @@ func main() {
 
 	m, _ := url.ParseQuery(u.RawQuery)
 
+	overrides := m["stateOverrides"][0]
 	sender := common.HexToAddress(m["from"][0])
 	recipient := common.HexToAddress(m["contractAddress"][0])
 	value := VALUE
 	data := common.FromHex(m["rawFunctionInput"][0])
+
+	decodedOverrides := cachingDB.(*state.CachingStateDB).SetOverrides(overrides)
 
 	nonce, err := client.PendingNonceAt(context.Background(), sender)
 	if err != nil {
@@ -148,7 +151,7 @@ func main() {
 
 	fmt.Printf("Transaction simulated successfully on chain %d at block %d\n", chainID.Int64(), block.Number().Int64())
 
-	validationFile, err := template.BuildValidationFile(chainID.String(), recipient.String(), diffs, domainHash, messageHash)
+	validationFile, err := template.BuildValidationFile(chainID.String(), recipient.String(), decodedOverrides, diffs, domainHash, messageHash)
 	if err != nil {
 		fmt.Printf("Error building validation file: %v\n", err)
 		os.Exit(1)

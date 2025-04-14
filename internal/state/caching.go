@@ -3,6 +3,7 @@ package state
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -18,6 +19,15 @@ import (
 	"github.com/ethereum/go-ethereum/trie/utils"
 	"github.com/holiman/uint256"
 )
+
+type StorageOverride struct {
+	Key   common.Hash
+	Value common.Hash
+}
+type Override struct {
+	ContractAddress common.Address
+	Storage         []StorageOverride
+}
 
 type StorageDiff struct {
 	Key         common.Hash
@@ -37,11 +47,12 @@ type StateDiff struct {
 
 // CachingStateDB implements a state database that caches fetched state data
 type CachingStateDB struct {
-	client *ethclient.Client
-	block  *types.Block
-	db     ethdb.Database
-	cache  *sync.Map
-	diffs  map[common.Address]StateDiff
+	client    *ethclient.Client
+	block     *types.Block
+	db        ethdb.Database
+	cache     *sync.Map
+	diffs     map[common.Address]StateDiff
+	Overrides []Override
 }
 
 // NewCachingStateDB creates a new caching state database
@@ -52,6 +63,64 @@ func NewCachingStateDB(client *ethclient.Client, block *types.Block, db ethdb.Da
 		db:     db,
 		cache:  &sync.Map{},
 		diffs:  make(map[common.Address]StateDiff),
+	}
+}
+
+func (db *CachingStateDB) SetOverrides(overrides string) []Override {
+	contractKey := "contractAddress:"
+	storageKey := "storage:"
+	keyKey := "key:"
+	valueKey := "value:"
+
+	var decodedOverrides []Override = []Override{}
+
+	count := strings.Count(overrides, contractKey)
+	for range count {
+		index := strings.Index(overrides, contractKey)
+		commaIdx := strings.Index(overrides, ",")
+
+		contractAddress := overrides[index+len(contractKey) : commaIdx]
+
+		storageBytes := overrides[commaIdx+2+len(storageKey):]
+		storageBytesEnd := strings.Index(storageBytes, "]")
+		storageBytes = storageBytes[:storageBytesEnd]
+
+		storageCount := strings.Count(storageBytes, keyKey)
+
+		var storageOverrides []StorageOverride = []StorageOverride{}
+
+		for range storageCount {
+			keyIdx := strings.Index(storageBytes, keyKey)
+			commaIdx := strings.Index(storageBytes, ",")
+			valueIdx := strings.Index(storageBytes, valueKey)
+			braceIdx := strings.Index(storageBytes, "}")
+
+			key := storageBytes[keyIdx+len(keyKey) : commaIdx]
+			value := storageBytes[valueIdx+len(valueKey) : braceIdx]
+
+			storageOverrides = append(storageOverrides, StorageOverride{Key: common.HexToHash(key), Value: common.HexToHash(value)})
+		}
+
+		decodedOverrides = append(decodedOverrides, Override{ContractAddress: common.HexToAddress(contractAddress), Storage: storageOverrides})
+
+	}
+
+	db.applyOverrides(decodedOverrides)
+
+	return decodedOverrides
+}
+
+func (db *CachingStateDB) GetOverrides() []Override {
+	return db.Overrides
+}
+
+func (db *CachingStateDB) applyOverrides(overrides []Override) {
+	db.Overrides = overrides
+
+	for _, override := range overrides {
+		for _, storageOverride := range override.Storage {
+			db.SetState(override.ContractAddress, storageOverride.Key, storageOverride.Value)
+		}
 	}
 }
 
