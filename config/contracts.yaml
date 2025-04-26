@@ -1,9 +1,29 @@
 contracts:
+  1:
+    0x9855054731540a48b28990b63dcf4f33d8ae46a1:
+      id: "MainnetCBSignerSafe"
+      name: "CB Signer Safe - Mainnet"
+      slots:
+        0x0000000000000000000000000000000000000000000000000000000000000002:
+          type: "address"
+          summary: "Updates the owners mapping"
+          override-meaning: ""
+        0x0000000000000000000000000000000000000000000000000000000000000003:
+          type: "uint256"
+          summary: "Updates the owner count"
+          override-meaning: "Sets the owner count to 1 so the transaction simulation can occur."
+        0x0000000000000000000000000000000000000000000000000000000000000004:
+          type: "uint256"
+          summary: "Updates the execution threshold"
+          override-meaning: "Override the threshold to 1 so the transaction simulation can occur."
+        0x0000000000000000000000000000000000000000000000000000000000000005:
+          type: "uint256"
+          summary: "Increments the nonce"
+          override-meaning: ""
   11155111:
     0x646132a1667ca7ad00d36616afba1a28116c770a:
       id: "SepoliaSafeA"
       name: "Signer Safe A - Sepolia"
-      general-name: "Signer Safe - Sepolia"
       slots:
         0x0000000000000000000000000000000000000000000000000000000000000004:
           type: "uint256"
@@ -16,7 +36,6 @@ contracts:
     0x6af0674791925f767060dd52f7fb20984e8639d8:
       id: "SepoliaSafeB"
       name: "Signer Safe B - Sepolia"
-      general-name: "Signer Safe - Sepolia"
       slots:
         0x0000000000000000000000000000000000000000000000000000000000000004:
           type: "uint256"

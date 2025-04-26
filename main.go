@@ -101,7 +101,9 @@ func main() {
 	)
 
 	// Create a new EVM instance with the state database
-	evm := vm.NewEVM(blockContext, cachingDB, chainConfig, vm.Config{})
+	var evmConfig vm.Config
+	evmConfig.EnablePreimageRecording = true
+	evm := vm.NewEVM(blockContext, cachingDB, chainConfig, evmConfig)
 
 	domainHash, messageHash, tenderlyLink, err := command.GetDomainAndMessageHash(privateKey, ledger, index, mnemonic, hdPath, "", prefix, suffix, workdir, skipSender)
 	if err != nil {

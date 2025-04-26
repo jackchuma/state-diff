@@ -33,6 +33,7 @@ type StorageDiff struct {
 	Key         common.Hash
 	ValueBefore common.Hash
 	ValueAfter  common.Hash
+	Preimage    string
 }
 
 type StateDiff struct {
@@ -52,17 +53,19 @@ type CachingStateDB struct {
 	db        ethdb.Database
 	cache     *sync.Map
 	diffs     map[common.Address]StateDiff
+	preimages map[common.Hash]string
 	Overrides []Override
 }
 
 // NewCachingStateDB creates a new caching state database
 func NewCachingStateDB(client *ethclient.Client, block *types.Block, db ethdb.Database) vm.StateDB {
 	return &CachingStateDB{
-		client: client,
-		block:  block,
-		db:     db,
-		cache:  &sync.Map{},
-		diffs:  make(map[common.Address]StateDiff),
+		client:    client,
+		block:     block,
+		db:        db,
+		cache:     &sync.Map{},
+		diffs:     make(map[common.Address]StateDiff),
+		preimages: make(map[common.Hash]string),
 	}
 }
 
@@ -284,6 +287,7 @@ func (db *CachingStateDB) SetState(addr common.Address, key, value common.Hash) 
 	}
 
 	storageDiff.ValueAfter = value
+	storageDiff.Preimage = db.preimages[key]
 	stateDiff.StorageDiffs[key] = storageDiff
 	db.diffs[addr] = stateDiff
 	db.cache.Store(getStorageCacheKey(addr, key), value)
@@ -352,6 +356,10 @@ func (diff *StateDiff) getStorageDiff(key common.Hash) StorageDiff {
 	return storageDiff
 }
 
+func (db *CachingStateDB) AddPreimage(hash common.Hash, preimage []byte) {
+	db.preimages[hash] = common.Bytes2Hex(preimage)
+}
+
 // AddAddressToAccessList adds an address to the access list
 func (db *CachingStateDB) AddAddressToAccessList(addr common.Address) {}
 
@@ -404,7 +412,6 @@ func (db *CachingStateDB) Empty(common.Address) bool               { return fals
 func (db *CachingStateDB) RevertToSnapshot(int)                    {}
 func (db *CachingStateDB) Snapshot() int                           { return 0 }
 func (db *CachingStateDB) AddLog(*types.Log)                       {}
-func (db *CachingStateDB) AddPreimage(common.Hash, []byte)         {}
 
 func (db *CachingStateDB) AccessEvents() *gethState.AccessEvents {
 	return nil
