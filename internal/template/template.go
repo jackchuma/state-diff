@@ -69,13 +69,11 @@ For each contract listed in the state diff, please verify that no contracts or s
 
 ## Task State Changes
 
-<pre>
-<code>
 <<StateChanges>>
 
------ Additional Nonce Changes -----
-  Details:           You should see a nonce increment for the account you're signing with.
-</pre>
+### Your Signer Address
+
+- Nonce increment
 
 <<EndStateChanges>>
 `
@@ -128,12 +126,12 @@ func handleStateOverrides(chainId string, template []byte, overrides []state.Ove
 
 	for _, override := range overrides {
 		contract := getContractCfg(cfg, chainId, override.ContractAddress.Hex())
+		stateOverrides += fmt.Sprintf("### %s (`%s`)\n\n", contract.Name, override.ContractAddress.Hex())
 
 		for _, storageOverride := range override.Storage {
 			slot := getSlot(&contract, storageOverride.Key.Hex(), "")
 
-			stateOverrides += fmt.Sprintf("- **Address**: `%s` <br/>\n", override.ContractAddress.Hex())
-			stateOverrides += fmt.Sprintf("  **Key**: `%s` <br/>\n", storageOverride.Key.Hex())
+			stateOverrides += fmt.Sprintf("- **Raw Slot**: `%s` <br/>\n", storageOverride.Key.Hex())
 			stateOverrides += fmt.Sprintf("  **Override**: `%s` <br/>\n", storageOverride.Value.Hex())
 			stateOverrides += fmt.Sprintf("  **Meaning**: %s\n", slot.OverrideMeaning)
 
@@ -178,6 +176,10 @@ func handleStateChanges(chainId string, template []byte, changes []state.StateDi
 			storageDiffs = append(storageDiffs, diff)
 		}
 
+		if len(storageDiffs) > 0 {
+			stateChanges += fmt.Sprintf("### %s (`%s`)\n\n", contract.Name, change.Address.Hex())
+		}
+
 		sort.Slice(storageDiffs, func(i, j int) bool {
 			return storageDiffs[i].Key.String() < storageDiffs[j].Key.String()
 		})
@@ -189,18 +191,13 @@ func handleStateChanges(chainId string, template []byte, changes []state.StateDi
 				continue
 			}
 
-			stateChanges += fmt.Sprintf("----- DecodedStateDiff[%v] -----\n", ctr)
-			stateChanges += fmt.Sprintf("  Who:               %s\n", change.Address.Hex())
-			stateChanges += fmt.Sprintf("  Contract:          %s\n", contract.Name)
-			stateChanges += fmt.Sprintf("  Chain ID:          %s\n", chainId)
-			stateChanges += fmt.Sprintf("  Raw Slot:          %s\n", diff.Key)
-			stateChanges += fmt.Sprintf("  Raw Old Value:     %s\n", diff.ValueBefore)
-			stateChanges += fmt.Sprintf("  Raw New Value:     %s\n", diff.ValueAfter)
-			stateChanges += fmt.Sprintf("  Decoded Kind:      %s\n", slot.Type)
-			stateChanges += fmt.Sprintf("  Decoded Old Value: %s\n", getDecodedValue(slot.Type, diff.ValueBefore.Hex()))
-			stateChanges += fmt.Sprintf("  Decoded New Value: %s\n", getDecodedValue(slot.Type, diff.ValueAfter.Hex()))
-			stateChanges += fmt.Sprintf("  Preimage:          %s\n\n", diff.Preimage)
-			stateChanges += fmt.Sprintf("  Summary:           %s\n\n", slot.Summary)
+			stateChanges += fmt.Sprintf("%v. **Raw Slot**: `%s` <br/>\n", ctr, diff.Key)
+			stateChanges += fmt.Sprintf("   **Raw Old Value**: `%s` <br/>\n", diff.ValueBefore)
+			stateChanges += fmt.Sprintf("   **Raw New Value**: `%s` <br/>\n", diff.ValueAfter)
+			stateChanges += fmt.Sprintf("   **Value Type**: %s <br/>\n", slot.Type)
+			stateChanges += fmt.Sprintf("   **Decoded Old Value**: `%s` <br/>\n", getDecodedValue(slot.Type, diff.ValueBefore.Hex()))
+			stateChanges += fmt.Sprintf("   **Decoded New Value**: `%s` <br/>\n", getDecodedValue(slot.Type, diff.ValueAfter.Hex()))
+			stateChanges += fmt.Sprintf("   **Meaning**: %s <br/>\n\n", slot.Summary)
 
 			ctr++
 		}
