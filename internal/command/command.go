@@ -11,31 +11,11 @@ import (
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
-	"golang.org/x/exp/slices"
 )
 
 // Most of this was pulled from https://github.com/base/eip712sign
-func GetDomainAndMessageHash(privateKey string, ledger bool, index int, mnemonic string, hdPath string, data string, prefix string, suffix string, workdir string, skipSender bool) ([]byte, []byte, string, error) {
-	options := 0
-	if privateKey != "" {
-		options++
-	}
-	if ledger {
-		options++
-	}
-	if mnemonic != "" {
-		options++
-	}
-	if options != 1 {
-		return nil, nil, "", fmt.Errorf("one (and only one) of --private-key, --ledger, --mnemonic must be set")
-	}
-
-	s, signerErr := createSigner(privateKey, mnemonic, hdPath, index)
-	if signerErr != nil {
-		return nil, nil, "", signerErr
-	}
-
-	input, err := readInput(data, skipSender, workdir, s)
+func GetDomainAndMessageHash(data, prefix, suffix, workdir string) ([]byte, []byte, string, error) {
+	input, err := readInput(data, workdir)
 	if err != nil {
 		return nil, nil, "", fmt.Errorf("error reading input: %w", err)
 	}
@@ -43,7 +23,7 @@ func GetDomainAndMessageHash(privateKey string, ledger bool, index int, mnemonic
 	return parseInput(input, prefix, suffix)
 }
 
-func readInput(data string, skipSender bool, workdir string, s signer) ([]byte, error) {
+func readInput(data, workdir string) ([]byte, error) {
 	if data != "" {
 		return []byte(data), nil
 	}
@@ -53,10 +33,6 @@ func readInput(data string, skipSender bool, workdir string, s signer) ([]byte, 
 	}
 
 	args := flag.Args()
-	if !skipSender && args[0] == "forge" && args[1] == "script" && !slices.Contains(args, "--sender") && s != nil {
-		args = append(args, "--sender", s.address().String())
-	}
-
 	fmt.Printf("Running '%s\n", strings.Join(args, " "))
 	return run(workdir, args[0], args[1:]...)
 }

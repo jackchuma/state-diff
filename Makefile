@@ -5,4 +5,4 @@ RPC=https://eth-mainnet.public.blastapi.io
 .PHONY: run
 run:
 	go run . --rpc $(RPC) -o validation.md \
-	--ledger --hd-paths "m/44'/60'/$(LEDGER_ACCOUNT)'/0/0" -- ./run.sh
+	-- ./run.sh --sender 0x9986ccaf9e3de0ffef82a0f7fa3a06d5afe07252

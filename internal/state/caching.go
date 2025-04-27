@@ -69,7 +69,7 @@ func NewCachingStateDB(client *ethclient.Client, block *types.Block, db ethdb.Da
 	}
 }
 
-func (db *CachingStateDB) SetOverrides(overrides string) []Override {
+func (db *CachingStateDB) SetOverrides(overrides string) {
 	contractKey := "contractAddress:"
 	storageKey := "storage:"
 	keyKey := "key:"
@@ -109,8 +109,6 @@ func (db *CachingStateDB) SetOverrides(overrides string) []Override {
 	}
 
 	db.applyOverrides(decodedOverrides)
-
-	return decodedOverrides
 }
 
 func (db *CachingStateDB) GetOverrides() []Override {
