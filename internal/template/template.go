@@ -7,8 +7,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/base/validation-generator/internal/state"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/jackchuma/state-diff/internal/state"
 	"gopkg.in/yaml.v2"
 )
 

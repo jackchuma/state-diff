@@ -1,4 +1,4 @@
-module github.com/base/validation-generator
+module github.com/jackchuma/state-diff
 
 go 1.23.0
 

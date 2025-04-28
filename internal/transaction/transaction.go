@@ -5,13 +5,13 @@ import (
 	"math/big"
 	"net/url"
 
-	"github.com/base/validation-generator/internal/state"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/tracing"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/holiman/uint256"
+	"github.com/jackchuma/state-diff/internal/state"
 )
 
 var VALUE = big.NewInt(0)
