@@ -6,7 +6,6 @@ import (
 	"net/url"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/tracing"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -15,7 +14,7 @@ import (
 )
 
 var VALUE = big.NewInt(0)
-var GAS = 8000000
+var GAS = uint64(8000000)
 
 func CreateTransaction(client *ethclient.Client, chainID *big.Int, m url.Values) (*types.Transaction, error) {
 	recipient := common.HexToAddress(m["contractAddress"][0])
@@ -27,37 +26,36 @@ func CreateTransaction(client *ethclient.Client, chainID *big.Int, m url.Values)
 		Nonce:     0,
 		GasTipCap: big.NewInt(0),
 		GasFeeCap: big.NewInt(0),
-		Gas:       uint64(GAS),
+		Gas:       GAS,
 		To:        &recipient,
 		Value:     value,
 		Data:      data,
 	}
 
-	// Create a sample transaction
 	return types.NewTx(&txData), nil
 }
 
 // SimulateTransaction simulates a transaction and returns the state diff
 func SimulateTransaction(evm *vm.EVM, tx *types.Transaction, from common.Address) ([]state.StateDiff, error) {
-	// Get initial state
 	statedb := evm.StateDB
 	to := *tx.To()
 
-	// Convert value to uint256
 	value := new(uint256.Int)
 	value.SetFromBig(tx.Value())
 
-	// Get current nonce and increment it
-	currentNonce := statedb.GetNonce(from)
-	statedb.SetNonce(from, currentNonce+1, tracing.NonceChangeUnspecified)
-
-	// Execute the transaction
-	_, _, err := evm.Call(from, to, tx.Data(), tx.Gas(), value)
+	ret, gasUsed, err := evm.Call(from, to, tx.Data(), tx.Gas(), value)
 	if err != nil {
-		return nil, fmt.Errorf("failed to execute transaction: %v", err)
+		if err == vm.ErrExecutionReverted {
+			reason := string(ret)
+			fmt.Printf("EVM Call reverted. Gas used: %d\n", gasUsed)
+			fmt.Printf("Revert reason bytes: %x\n", ret)
+			fmt.Printf("Revert reason: %s\n", reason)
+			return nil, fmt.Errorf("transaction reverted during simulation: %w", err)
+		} else {
+			return nil, fmt.Errorf("failed to execute transaction simulation: %w", err)
+		}
 	}
 
-	// Get changed slots from our caching state DB
 	cachingDB := statedb.(*state.CachingStateDB)
 	return cachingDB.GetStateDiffs(), nil
 }

@@ -2,12 +2,12 @@ package state
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
-	"strings"
 	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
-	gethState "github.com/ethereum/go-ethereum/core/state"
+	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/stateless"
 	"github.com/ethereum/go-ethereum/core/tracing"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -20,13 +20,16 @@ import (
 	"github.com/holiman/uint256"
 )
 
+var DEBUG_LOGGING = false
+
 type StorageOverride struct {
-	Key   common.Hash
-	Value common.Hash
+	Key   common.Hash `json:"key"`
+	Value common.Hash `json:"value"`
 }
+
 type Override struct {
-	ContractAddress common.Address
-	Storage         []StorageOverride
+	ContractAddress common.Address    `json:"contractAddress"`
+	Storage         []StorageOverride `json:"storage"`
 }
 
 type StorageDiff struct {
@@ -34,6 +37,7 @@ type StorageDiff struct {
 	ValueBefore common.Hash
 	ValueAfter  common.Hash
 	Preimage    string
+	isSet       bool
 }
 
 type StateDiff struct {
@@ -70,42 +74,11 @@ func NewCachingStateDB(client *ethclient.Client, block *types.Block, db ethdb.Da
 }
 
 func (db *CachingStateDB) SetOverrides(overrides string) {
-	contractKey := "contractAddress:"
-	storageKey := "storage:"
-	keyKey := "key:"
-	valueKey := "value:"
-
-	var decodedOverrides []Override = []Override{}
-
-	count := strings.Count(overrides, contractKey)
-	for range count {
-		index := strings.Index(overrides, contractKey)
-		commaIdx := strings.Index(overrides, ",")
-
-		contractAddress := overrides[index+len(contractKey) : commaIdx]
-
-		storageBytes := overrides[commaIdx+2+len(storageKey):]
-		storageBytesEnd := strings.Index(storageBytes, "]")
-		storageBytes = storageBytes[:storageBytesEnd]
-
-		storageCount := strings.Count(storageBytes, keyKey)
-
-		var storageOverrides []StorageOverride = []StorageOverride{}
-
-		for range storageCount {
-			keyIdx := strings.Index(storageBytes, keyKey)
-			commaIdx := strings.Index(storageBytes, ",")
-			valueIdx := strings.Index(storageBytes, valueKey)
-			braceIdx := strings.Index(storageBytes, "}")
-
-			key := storageBytes[keyIdx+len(keyKey) : commaIdx]
-			value := storageBytes[valueIdx+len(valueKey) : braceIdx]
-
-			storageOverrides = append(storageOverrides, StorageOverride{Key: common.HexToHash(key), Value: common.HexToHash(value)})
-		}
-
-		decodedOverrides = append(decodedOverrides, Override{ContractAddress: common.HexToAddress(contractAddress), Storage: storageOverrides})
-
+	var decodedOverrides []Override
+	err := json.Unmarshal([]byte(overrides), &decodedOverrides)
+	if err != nil {
+		fmt.Printf("Error unmarshalling overrides JSON: %v\n", err)
+		return
 	}
 
 	db.applyOverrides(decodedOverrides)
@@ -210,6 +183,7 @@ func (db *CachingStateDB) GetState(addr common.Address, key common.Hash) common.
 	// Fetch from RPC if not in cache
 	value, err := db.client.StorageAt(context.Background(), addr, key, db.block.Number())
 	if err != nil {
+		fmt.Println("ERROR FROM GET STATE!!!!!", err)
 		return common.Hash{}
 	}
 
@@ -253,7 +227,7 @@ func (db *CachingStateDB) SubBalance(addr common.Address, amount *uint256.Int, _
 
 	db.diffs[addr] = stateDiff
 	db.cache.Store(getBalanceCacheKey(addr), stateDiff.BalanceAfter)
-	return *stateDiff.BalanceAfter
+	return *balanceBefore
 }
 
 func (db *CachingStateDB) AddBalance(addr common.Address, amount *uint256.Int, _ tracing.BalanceChangeReason) uint256.Int {
@@ -271,7 +245,7 @@ func (db *CachingStateDB) AddBalance(addr common.Address, amount *uint256.Int, _
 
 	db.diffs[addr] = stateDiff
 	db.cache.Store(getBalanceCacheKey(addr), stateDiff.BalanceAfter)
-	return *stateDiff.BalanceAfter
+	return *balanceBefore
 }
 
 // SetState tracks state changes
@@ -280,8 +254,9 @@ func (db *CachingStateDB) SetState(addr common.Address, key, value common.Hash) 
 	storageDiff := stateDiff.getStorageDiff(key)
 
 	valueBefore := db.GetState(addr, key)
-	if storageDiff.ValueBefore == (common.Hash{}) {
+	if !storageDiff.isSet {
 		storageDiff.ValueBefore = valueBefore
+		storageDiff.isSet = true
 	}
 
 	storageDiff.ValueAfter = value
@@ -289,7 +264,7 @@ func (db *CachingStateDB) SetState(addr common.Address, key, value common.Hash) 
 	stateDiff.StorageDiffs[key] = storageDiff
 	db.diffs[addr] = stateDiff
 	db.cache.Store(getStorageCacheKey(addr, key), value)
-	return value
+	return valueBefore
 }
 
 // SetNonce tracks state changes
@@ -331,7 +306,7 @@ func getCodeCacheKey(addr common.Address) common.Hash {
 }
 
 func getStorageCacheKey(addr common.Address, key common.Hash) common.Hash {
-	return common.BytesToHash(append(addr.Bytes(), key.Bytes()...))
+	return crypto.Keccak256Hash(append(addr.Bytes(), key.Bytes()...))
 }
 
 func (db *CachingStateDB) getStateDiff(addr common.Address) StateDiff {
@@ -358,79 +333,190 @@ func (db *CachingStateDB) AddPreimage(hash common.Hash, preimage []byte) {
 	db.preimages[hash] = common.Bytes2Hex(preimage)
 }
 
+func (db *CachingStateDB) GetCodeHash(addr common.Address) common.Hash {
+	// Retrieve code from cache or RPC
+	code := db.GetCode(addr)
+	if len(code) == 0 {
+		return common.Hash{}
+	}
+	return crypto.Keccak256Hash(code)
+}
+func (db *CachingStateDB) GetCodeSize(addr common.Address) int {
+	code := db.GetCode(addr)
+	return len(code)
+}
+
 // AddAddressToAccessList adds an address to the access list
-func (db *CachingStateDB) AddAddressToAccessList(addr common.Address) {}
+func (db *CachingStateDB) AddAddressToAccessList(addr common.Address) {
+	if DEBUG_LOGGING {
+		fmt.Println("AddAddressToAccessList", addr)
+	}
+}
 
 // AddSlotToAccessList adds a slot to the access list
-func (db *CachingStateDB) AddSlotToAccessList(addr common.Address, slot common.Hash) {}
+func (db *CachingStateDB) AddSlotToAccessList(addr common.Address, slot common.Hash) {
+	if DEBUG_LOGGING {
+		fmt.Println("AddSlotToAccessList", addr, slot)
+	}
+}
 
 // AddressInAccessList checks if an address is in the access list
-func (db *CachingStateDB) AddressInAccessList(addr common.Address) bool { return true }
+func (db *CachingStateDB) AddressInAccessList(addr common.Address) bool {
+	if DEBUG_LOGGING {
+		fmt.Println("AddressInAccessList", addr)
+	}
+	return true
+}
 
 // GetTransientState gets the transient state for an address and key
 func (db *CachingStateDB) GetTransientState(addr common.Address, key common.Hash) common.Hash {
+	if DEBUG_LOGGING {
+		fmt.Println("GetTransientState", addr, key)
+	}
 	return common.Hash{}
 }
 
 // Prepare prepares the state database for a new transaction
 func (db *CachingStateDB) Prepare(rules params.Rules, sender, coinbase common.Address, dest *common.Address, precompiles []common.Address, txAccesses types.AccessList) {
+	if DEBUG_LOGGING {
+		fmt.Println("Prepare")
+	}
 }
 
 // Selfdestruct6780 implements the EIP-6780 selfdestruct behavior
 func (db *CachingStateDB) SelfDestruct6780(addr common.Address) (uint256.Int, bool) {
+	if DEBUG_LOGGING {
+		fmt.Println("SelfDestruct6780", addr)
+	}
 	return *uint256.NewInt(0), false
 }
 
 // SetTransientState sets the transient state for an address and key
-func (db *CachingStateDB) SetTransientState(addr common.Address, key, value common.Hash) {}
+func (db *CachingStateDB) SetTransientState(addr common.Address, key, value common.Hash) {
+	if DEBUG_LOGGING {
+		fmt.Println("SetTransientState", addr, key, value)
+	}
+}
 
 // SlotInAccessList checks if a slot is in the access list
 func (db *CachingStateDB) SlotInAccessList(addr common.Address, slot common.Hash) (bool, bool) {
+	if DEBUG_LOGGING {
+		fmt.Println("SlotInAccessList", addr, slot)
+	}
 	return true, true
 }
 
 // Required vm.StateDB interface methods that we don't need to implement for simulation
-func (db *CachingStateDB) CreateAccount(common.Address)           {}
-func (db *CachingStateDB) GetCodeHash(common.Address) common.Hash { return common.Hash{} }
-func (db *CachingStateDB) GetCodeSize(common.Address) int         { return 0 }
-func (db *CachingStateDB) GetRefund() uint64                      { return 0 }
-func (db *CachingStateDB) GetCommittedState(common.Address, common.Hash) common.Hash {
+func (db *CachingStateDB) CreateAccount(addr common.Address) {
+	if DEBUG_LOGGING {
+		fmt.Println("CreateAccount", addr)
+	}
+}
+func (db *CachingStateDB) GetRefund() uint64 {
+	if DEBUG_LOGGING {
+		fmt.Println("GetRefund")
+	}
+	return 0
+}
+func (db *CachingStateDB) GetCommittedState(addr common.Address, key common.Hash) common.Hash {
+	if DEBUG_LOGGING {
+		fmt.Printf("GetCommittedState(%s, %s)\n", addr, key)
+	}
 	return common.Hash{}
 }
 func (db *CachingStateDB) SetCode(common.Address, []byte) []byte {
-	fmt.Println("SetCode")
+	if DEBUG_LOGGING {
+		fmt.Println("SetCode")
+	}
 	return nil
 }
-func (db *CachingStateDB) AddRefund(uint64)                        {}
-func (db *CachingStateDB) SubRefund(uint64)                        {}
-func (db *CachingStateDB) SelfDestruct(common.Address) uint256.Int { return *uint256.NewInt(0) }
-func (db *CachingStateDB) HasSelfDestructed(common.Address) bool   { return false }
-func (db *CachingStateDB) Exist(common.Address) bool               { return true }
-func (db *CachingStateDB) Empty(common.Address) bool               { return false }
-func (db *CachingStateDB) RevertToSnapshot(int)                    {}
-func (db *CachingStateDB) Snapshot() int                           { return 0 }
-func (db *CachingStateDB) AddLog(*types.Log)                       {}
+func (db *CachingStateDB) AddRefund(amt uint64) {
+	if DEBUG_LOGGING {
+		fmt.Println("AddRefund", amt)
+	}
+}
+func (db *CachingStateDB) SubRefund(amt uint64) {
+	if DEBUG_LOGGING {
+		fmt.Println("SubRefund", amt)
+	}
+}
+func (db *CachingStateDB) SelfDestruct(addr common.Address) uint256.Int {
+	if DEBUG_LOGGING {
+		fmt.Println("SelfDestruct", addr)
+	}
+	return *uint256.NewInt(0)
+}
+func (db *CachingStateDB) HasSelfDestructed(addr common.Address) bool {
+	if DEBUG_LOGGING {
+		fmt.Println("HasSelfDestructed", addr)
+	}
+	return false
+}
+func (db *CachingStateDB) Exist(addr common.Address) bool {
+	if DEBUG_LOGGING {
+		fmt.Println("Exist", addr)
+	}
+	return true
+}
+func (db *CachingStateDB) Empty(addr common.Address) bool {
+	if DEBUG_LOGGING {
+		fmt.Println("Empty", addr)
+	}
+	return false
+}
+func (db *CachingStateDB) RevertToSnapshot(amt int) {
+	if DEBUG_LOGGING {
+		fmt.Println("RevertToSnapshot", amt)
+	}
+}
+func (db *CachingStateDB) Snapshot() int {
+	if DEBUG_LOGGING {
+		fmt.Println("Snapshot")
+	}
+	return 0
+}
+func (db *CachingStateDB) AddLog(*types.Log) {
+	if DEBUG_LOGGING {
+		fmt.Println("AddLog")
+	}
+}
 
-func (db *CachingStateDB) AccessEvents() *gethState.AccessEvents {
+func (db *CachingStateDB) AccessEvents() *state.AccessEvents {
+	if DEBUG_LOGGING {
+		fmt.Println("AccessEvents")
+	}
 	return nil
 }
 
 func (db *CachingStateDB) CreateContract(addr common.Address) {
-	// No-op for our caching implementation
+	if DEBUG_LOGGING {
+		fmt.Println("CreateContract", addr)
+	}
 }
 
 func (db *CachingStateDB) Finalise(deleteEmptyObjects bool) {
-	// No-op for our caching implementation
+	if DEBUG_LOGGING {
+		fmt.Println("Finalise")
+	}
 }
 
 func (db *CachingStateDB) GetStorageRoot(addr common.Address) common.Hash {
+	if DEBUG_LOGGING {
+		fmt.Println("GetStorageRoot", addr)
+	}
 	return common.Hash{}
 }
 
 func (db *CachingStateDB) PointCache() *utils.PointCache {
+	if DEBUG_LOGGING {
+		fmt.Println("PointCache")
+	}
 	return nil
 }
 
 func (db *CachingStateDB) Witness() *stateless.Witness {
+	if DEBUG_LOGGING {
+		fmt.Println("Witness")
+	}
 	return nil
 }
