@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/big"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -79,9 +80,24 @@ For each contract listed in the state diff, please verify that no contracts or s
 `
 
 func loadConfig() (*Config, error) {
-	configFile, err := os.ReadFile("config/contracts.yaml")
+	// Get the directory of the executable
+	exePath, err := os.Executable()
 	if err != nil {
-		return nil, fmt.Errorf("error reading config file: %v", err)
+		return nil, fmt.Errorf("error getting executable path: %w", err)
+	}
+	exeDir := filepath.Dir(exePath)
+	configPath := filepath.Join(exeDir, "config", "contracts.yaml")
+
+	// Try reading relative to executable first
+	configFile, err := os.ReadFile(configPath)
+	if err != nil {
+		// Fallback: Try reading from the relative path (for development)
+		configPath = "config/contracts.yaml"
+		configFile, err = os.ReadFile(configPath)
+		if err != nil {
+			// If both fail, return a combined error message
+			return nil, fmt.Errorf("error reading config file (tried %s and %s): %w", filepath.Join(exeDir, "config", "contracts.yaml"), "config/contracts.yaml", err)
+		}
 	}
 
 	var config Config
