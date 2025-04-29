@@ -133,13 +133,13 @@ func handleStateOverrides(chainId string, template []byte, overrides []state.Ove
 
 			stateOverrides += fmt.Sprintf("- **Raw Slot**: `%s` <br/>\n", storageOverride.Key.Hex())
 			stateOverrides += fmt.Sprintf("  **Override**: `%s` <br/>\n", storageOverride.Value.Hex())
-			stateOverrides += fmt.Sprintf("  **Meaning**: %s\n", slot.OverrideMeaning)
+			stateOverrides += fmt.Sprintf("  **Meaning**: %s\n\n", slot.OverrideMeaning)
 
 			counter++
 		}
 	}
 
-	stateOverrides = strings.TrimSuffix(stateOverrides, "\n")
+	stateOverrides = strings.TrimSuffix(stateOverrides, "\n\n")
 
 	template = []byte(strings.Replace(string(template), "<<StateOverrides>>", stateOverrides, 1))
 

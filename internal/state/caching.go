@@ -93,7 +93,7 @@ func (db *CachingStateDB) applyOverrides(overrides []Override) {
 
 	for _, override := range overrides {
 		for _, storageOverride := range override.Storage {
-			db.SetState(override.ContractAddress, storageOverride.Key, storageOverride.Value)
+			db.setState(override.ContractAddress, storageOverride.Key, storageOverride.Value, true)
 		}
 	}
 }
@@ -248,12 +248,19 @@ func (db *CachingStateDB) AddBalance(addr common.Address, amount *uint256.Int, _
 	return *balanceBefore
 }
 
-// SetState tracks state changes
 func (db *CachingStateDB) SetState(addr common.Address, key, value common.Hash) common.Hash {
+	return db.setState(addr, key, value, false)
+}
+
+func (db *CachingStateDB) setState(addr common.Address, key, value common.Hash, isOverride bool) common.Hash {
 	stateDiff := db.getStateDiff(addr)
 	storageDiff := stateDiff.getStorageDiff(key)
 
 	valueBefore := db.GetState(addr, key)
+	if isOverride {
+		valueBefore = value
+	}
+
 	if !storageDiff.isSet {
 		storageDiff.ValueBefore = valueBefore
 		storageDiff.isSet = true
