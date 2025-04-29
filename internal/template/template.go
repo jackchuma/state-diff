@@ -1,14 +1,14 @@
 package template
 
 import (
+	_ "embed"
 	"fmt"
 	"math/big"
-	"os"
-	"path/filepath"
 	"sort"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/jackchuma/state-diff/config"
 	"github.com/jackchuma/state-diff/internal/state"
 	"gopkg.in/yaml.v2"
 )
@@ -80,33 +80,15 @@ For each contract listed in the state diff, please verify that no contracts or s
 `
 
 func loadConfig() (*Config, error) {
-	// Get the directory of the executable
-	exePath, err := os.Executable()
+	// Use the embedded config file content
+	var cfg Config
+	err := yaml.Unmarshal(config.EmbeddedConfigFile, &cfg)
 	if err != nil {
-		return nil, fmt.Errorf("error getting executable path: %w", err)
-	}
-	exeDir := filepath.Dir(exePath)
-	configPath := filepath.Join(exeDir, "config", "contracts.yaml")
-
-	// Try reading relative to executable first
-	configFile, err := os.ReadFile(configPath)
-	if err != nil {
-		// Fallback: Try reading from the relative path (for development)
-		configPath = "config/contracts.yaml"
-		configFile, err = os.ReadFile(configPath)
-		if err != nil {
-			// If both fail, return a combined error message
-			return nil, fmt.Errorf("error reading config file (tried %s and %s): %w", filepath.Join(exeDir, "config", "contracts.yaml"), "config/contracts.yaml", err)
-		}
+		// If unmarshalling fails, return an error
+		return nil, fmt.Errorf("error parsing embedded config file: %w", err)
 	}
 
-	var config Config
-	err = yaml.Unmarshal(configFile, &config)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing config file: %v", err)
-	}
-
-	return &config, nil
+	return &cfg, nil
 }
 
 func BuildValidationFile(chainId, safe string, overrides []state.Override, diffs []state.StateDiff, domainHash, messageHash []byte) ([]byte, error) {
