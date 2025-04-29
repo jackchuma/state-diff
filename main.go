@@ -86,7 +86,13 @@ func main() {
 
 	fmt.Printf("Transaction simulated successfully on chain %d at block %d\n", chainID.Int64(), evm.Context.BlockNumber.Int64())
 
-	validationFile, err := template.BuildValidationFile(chainID.String(), tx.To().String(), evm.StateDB.(*state.CachingStateDB).GetOverrides(), diffs, domainHash, messageHash)
+	targetSafe, err := transaction.GetTargetedSafe(tx)
+	if err != nil {
+		fmt.Printf("Error getting target safe: %v\n", err)
+		os.Exit(1)
+	}
+
+	validationFile, err := template.BuildValidationFile(chainID.String(), targetSafe, evm.StateDB.(*state.CachingStateDB).GetOverrides(), diffs, domainHash, messageHash)
 	if err != nil {
 		fmt.Printf("Error building validation file: %v\n", err)
 		os.Exit(1)
