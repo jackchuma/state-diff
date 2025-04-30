@@ -35,6 +35,10 @@ var starterTemplate = `# Validation
 
 This document can be used to validate the inputs and result of the execution of the upgrade transaction which you are signing.
 
+> [!NOTE]
+>
+> This document provides names for each contract address to add clarity to what you are seeing. These names will not be visible in the Tenderly UI. All that matters is that addresses and storage slot hex values match exactly what is presented in this document.
+
 The steps are:
 
 1. [Validate the Domain and Message Hashes](#expected-domain-and-message-hashes)
@@ -55,8 +59,7 @@ First, we need to validate the domain and message hashes. These values should ma
 For each contract listed in the state diff, please verify that no contracts or state changes shown in the Tenderly diff are missing from this document. Additionally, please verify that for each contract:
 
 - The following state changes (and none others) are made to that contract. This validates that no unexpected state changes occur.
-- All addresses (in section headers and storage values) match the provided name, using the Etherscan and Superchain Registry links provided. This validates the bytecode deployed at the addresses contains the correct logic.
-- All key values match the semantic meaning provided, which can be validated using the storage layout links provided.
+- All key values match the semantic meaning provided, which can be validated using the terminal commands provided.
 
 <<StartStateOverrides>>
 
@@ -77,6 +80,9 @@ For each contract listed in the state diff, please verify that no contracts or s
 - Nonce increment
 
 <<EndStateChanges>>
+
+You can now navigate back to the [README](../README.md#43-extract-the-domain-hash-and-the-message-hash-to-approve) to continue the signing process.
+
 `
 
 func loadConfig() (*Config, error) {
@@ -129,7 +135,7 @@ func handleStateOverrides(chainId string, template []byte, overrides []state.Ove
 		for _, storageOverride := range override.Storage {
 			slot := getSlot(&contract, storageOverride.Key.Hex(), "")
 
-			stateOverrides += fmt.Sprintf("- **Raw Slot**: `%s` <br/>\n", storageOverride.Key.Hex())
+			stateOverrides += fmt.Sprintf("- **Key**: `%s` <br/>\n", storageOverride.Key.Hex())
 			stateOverrides += fmt.Sprintf("  **Override**: `%s` <br/>\n", storageOverride.Value.Hex())
 			stateOverrides += fmt.Sprintf("  **Meaning**: %s\n\n", slot.OverrideMeaning)
 
@@ -189,9 +195,9 @@ func handleStateChanges(chainId string, template []byte, changes []state.StateDi
 				continue
 			}
 
-			stateChanges += fmt.Sprintf("%v. **Raw Slot**: `%s` <br/>\n", ctr, diff.Key)
-			stateChanges += fmt.Sprintf("   **Raw Old Value**: `%s` <br/>\n", diff.ValueBefore)
-			stateChanges += fmt.Sprintf("   **Raw New Value**: `%s` <br/>\n", diff.ValueAfter)
+			stateChanges += fmt.Sprintf("%v. **Key**: `%s` <br/>\n", ctr, diff.Key)
+			stateChanges += fmt.Sprintf("   **Before**: `%s` <br/>\n", diff.ValueBefore)
+			stateChanges += fmt.Sprintf("   **After**: `%s` <br/>\n", diff.ValueAfter)
 			stateChanges += fmt.Sprintf("   **Value Type**: %s <br/>\n", slot.Type)
 			stateChanges += fmt.Sprintf("   **Decoded Old Value**: `%s` <br/>\n", getDecodedValue(slot.Type, diff.ValueBefore.Hex()))
 			stateChanges += fmt.Sprintf("   **Decoded New Value**: `%s` <br/>\n", getDecodedValue(slot.Type, diff.ValueAfter.Hex()))
@@ -210,7 +216,7 @@ func handleStateChanges(chainId string, template []byte, changes []state.StateDi
 
 	// Remove the <<StartStateChanges>> placeholder and the following line
 	template = []byte(strings.Replace(string(template), "<<StartStateChanges>>\n\n", "", 1))
-	template = []byte(strings.Replace(string(template), "<<EndStateChanges>>\n", "", 1))
+	template = []byte(strings.Replace(string(template), "<<EndStateChanges>>\n\n", "", 1))
 
 	template = []byte(strings.TrimSuffix(string(template), "\n"))
 
