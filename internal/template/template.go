@@ -125,12 +125,20 @@ func handleMessageIdentifiers(chainId, safe string, domainHash, messageHash []by
 }
 
 func handleStateOverrides(chainId string, template []byte, overrides []state.Override, cfg *Config) []byte {
+	sort.Slice(overrides, func(i, j int) bool {
+		return overrides[i].ContractAddress.String() < overrides[j].ContractAddress.String()
+	})
+
 	var stateOverrides string
 	counter := 0
 
 	for _, override := range overrides {
 		contract := getContractCfg(cfg, chainId, override.ContractAddress.Hex())
 		stateOverrides += fmt.Sprintf("### %s (`%s`)\n\n", contract.Name, override.ContractAddress.Hex())
+
+		sort.Slice(override.Storage, func(i, j int) bool {
+			return override.Storage[i].Key.String() < override.Storage[j].Key.String()
+		})
 
 		for _, storageOverride := range override.Storage {
 			slot := getSlot(&contract, storageOverride.Key.Hex(), "")
