@@ -72,7 +72,7 @@ func main() {
 	overrides := m["stateOverrides"][0]
 	evm, err := evm.NewEVM(client, chainID, overrides)
 	if err != nil {
-		log.Fatal("Failed to create evm", err)
+		log.Fatal("Failed to create evm: ", err)
 	}
 
 	sender := common.HexToAddress(m["from"][0])

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -53,7 +54,7 @@ type StateDiff struct {
 // CachingStateDB implements a state database that caches fetched state data
 type CachingStateDB struct {
 	client    *ethclient.Client
-	block     *types.Block
+	blockNum  *big.Int
 	db        ethdb.Database
 	cache     *sync.Map
 	diffs     map[common.Address]StateDiff
@@ -62,10 +63,10 @@ type CachingStateDB struct {
 }
 
 // NewCachingStateDB creates a new caching state database
-func NewCachingStateDB(client *ethclient.Client, block *types.Block, db ethdb.Database) vm.StateDB {
+func NewCachingStateDB(client *ethclient.Client, blockNum *big.Int, db ethdb.Database) vm.StateDB {
 	return &CachingStateDB{
 		client:    client,
-		block:     block,
+		blockNum:  blockNum,
 		db:        db,
 		cache:     &sync.Map{},
 		diffs:     make(map[common.Address]StateDiff),
@@ -138,7 +139,7 @@ func (db *CachingStateDB) GetBalance(addr common.Address) *uint256.Int {
 	}
 
 	// Fetch from RPC if not in cache
-	balance, err := db.client.BalanceAt(context.Background(), addr, db.block.Number())
+	balance, err := db.client.BalanceAt(context.Background(), addr, db.blockNum)
 	if err != nil {
 		return uint256.NewInt(0)
 	}
@@ -160,7 +161,7 @@ func (db *CachingStateDB) GetCode(addr common.Address) []byte {
 	}
 
 	// Fetch from RPC if not in cache
-	code, err := db.client.CodeAt(context.Background(), addr, db.block.Number())
+	code, err := db.client.CodeAt(context.Background(), addr, db.blockNum)
 	if err != nil {
 		return nil
 	}
@@ -181,7 +182,7 @@ func (db *CachingStateDB) GetState(addr common.Address, key common.Hash) common.
 	}
 
 	// Fetch from RPC if not in cache
-	value, err := db.client.StorageAt(context.Background(), addr, key, db.block.Number())
+	value, err := db.client.StorageAt(context.Background(), addr, key, db.blockNum)
 	if err != nil {
 		fmt.Println("ERROR FROM GET STATE!!!!!", err)
 		return common.Hash{}
@@ -202,7 +203,7 @@ func (db *CachingStateDB) GetNonce(addr common.Address) uint64 {
 	}
 
 	// Fetch from RPC if not in cache
-	nonce, err := db.client.NonceAt(context.Background(), addr, db.block.Number())
+	nonce, err := db.client.NonceAt(context.Background(), addr, db.blockNum)
 	if err != nil {
 		return 0
 	}
