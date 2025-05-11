@@ -173,3 +173,40 @@ contracts:
           type: "uint256"
           summary: "Increments the nonce"
           override-meaning: ""
+  8453:
+    0xd94e416cf2c7167608b2515b7e4102b41efff94f:
+      id: "BaseCBSignerSafe"
+      name: "CB Signer Safe - Base Mainnet"
+      slots:
+        0x0000000000000000000000000000000000000000000000000000000000000002:
+          type: "address"
+          summary: "Updates the owners mapping"
+          override-meaning: ""
+        0x0000000000000000000000000000000000000000000000000000000000000003:
+          type: "uint256"
+          summary: "Updates the owner count"
+          override-meaning: "Sets the owner count to 1 so the transaction simulation can occur."
+        0x0000000000000000000000000000000000000000000000000000000000000004:
+          type: "uint256"
+          summary: "Updates the execution threshold"
+          override-meaning: "Override the threshold to 1 so the transaction simulation can occur."
+        0x0000000000000000000000000000000000000000000000000000000000000005:
+          type: "uint256"
+          summary: "Increments the nonce"
+          override-meaning: ""
+        0xe90b7bceb6e7df5418fb78d8ee546e97c83a08bbccc01a0644d599ccd2a7c2e0:
+          type: "uint256"
+          summary: "Increments the nonce"
+          override-meaning: "This is owners[1] -> 0xca11bde05977b3631167028862be2a173976ca11, so the key can be derived from `cast index address 0x0000000000000000000000000000000000000001 2`."
+        0x316a0aac0d94f5824f0b66f5bbe94a8c360a17699a1d3a233aafcf7146e9f11c:
+          type: "uint256"
+          summary: "Increments the nonce"
+          override-meaning: "This is owners[0xca11bde05977b3631167028862be2a173976ca11] -> 1, so the key can be derived from `cast index address 0xca11bde05977b3631167028862be2a173976ca11 2`."
+    0x09c7bad99688a55a2e83644bfaed09e62bdcccba:
+      id: "BaseFeeDispurser"
+      name: "Fee Dispurser - Base Mainnet"
+      slots:
+        0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103:
+          type: "address"
+          summary: "Updates the proxy admin"
+          override-meaning: ""
