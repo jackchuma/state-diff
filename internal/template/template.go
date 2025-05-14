@@ -20,15 +20,17 @@ type Slot struct {
 }
 
 type Contract struct {
+	ID    string          `yaml:"id,omitempty"`
 	Name  string          `yaml:"name"`
 	Slots map[string]Slot `yaml:"slots"`
 }
 
 type Config struct {
-	Contracts map[string]map[string]Contract `yaml:"contracts"`
+	Contracts      map[string]map[string]Contract `yaml:"contracts"`
+	StorageLayouts map[string]map[string]Slot     `yaml:"storage-layouts"`
 }
 
-var DEFAULT_CONTRACT = Contract{Name: "<<ContractName>>", Slots: map[string]Slot{}}
+var DEFAULT_CONTRACT = Contract{ID: "<<DefaultContractID>>", Name: "<<ContractName>>", Slots: map[string]Slot{}}
 var DEFAULT_SLOT = Slot{Type: "<<DecodedKind>>", Summary: "<<Summary>>", OverrideMeaning: "<<OverrideMeaning>>"}
 
 var starterTemplate = `# Validation
@@ -105,13 +107,72 @@ func NewFileGenerator(db *state.CachingStateDB, chainId string) (*FileGenerator,
 func loadConfig() (*Config, error) {
 	// Use the embedded config file content
 	var cfg Config
-	err := yaml.Unmarshal(config.EmbeddedConfigFile, &cfg)
+	// err := yaml.Unmarshal(config.EmbeddedConfigFile, &cfg)
+	err := cfg.UnmarshalYAML()
 	if err != nil {
 		// If unmarshalling fails, return an error
 		return nil, fmt.Errorf("error parsing embedded config file: %w", err)
 	}
 
 	return &cfg, nil
+}
+
+// UnmarshalYAML implements the yaml.Unmarshaler interface for Config.
+// This custom unmarshaler handles the case where a contract's slots can be
+// defined directly or as a reference to a pre-defined storage layout
+// (e.g., "${{storage-layouts.gnosis-safe}}").
+func (c *Config) UnmarshalYAML() error {
+	// Define auxiliary types to handle the flexible 'slots' field during initial parsing.
+	type auxContractDefinition struct {
+		ID    string `yaml:"id"`
+		Name  string `yaml:"name"`
+		Slots any    `yaml:"slots"` // Slots can be a map or a string reference
+	}
+	type auxConfigStructure struct {
+		Contracts      map[string]map[string]auxContractDefinition `yaml:"contracts"`
+		StorageLayouts map[string]map[string]Slot                  `yaml:"storage-layouts"`
+	}
+
+	var rawAuxData auxConfigStructure
+	if err := yaml.Unmarshal(config.EmbeddedConfigFile, &rawAuxData); err != nil {
+		return fmt.Errorf("error unmarshaling raw config structure: %w", err)
+	}
+
+	c.StorageLayouts = rawAuxData.StorageLayouts
+	c.Contracts = make(map[string]map[string]Contract)
+
+	for chainID, contractAddressesMap := range rawAuxData.Contracts {
+		c.Contracts[chainID] = make(map[string]Contract)
+		for contractAddr, rawContract := range contractAddressesMap {
+			finalizedContract := Contract{
+				ID:   rawContract.ID,
+				Name: rawContract.Name,
+			}
+
+			switch slotsValue := rawContract.Slots.(type) {
+			case string:
+				// Handle string references like "${{storage-layouts.LAYOUT_NAME}}"
+				if strings.HasPrefix(slotsValue, "${{storage-layouts.") && strings.HasSuffix(slotsValue, "}}") {
+					layoutName := strings.TrimSuffix(strings.TrimPrefix(slotsValue, "${{storage-layouts."), "}}")
+					if layout, ok := rawAuxData.StorageLayouts[layoutName]; ok {
+						finalizedContract.Slots = layout
+					} else {
+						return fmt.Errorf("storage layout '%s' referenced by contract '%s' (address: %s, chain: %s) not found in storage-layouts section", layoutName, rawContract.Name, contractAddr, chainID)
+					}
+				} else {
+					return fmt.Errorf("invalid string format for slots on contract '%s' (address: %s, chain: %s): expected '${{storage-layouts.LAYOUT_NAME}}', got '%s'", rawContract.Name, contractAddr, chainID, slotsValue)
+				}
+			case nil:
+				// If 'slots' is null or not provided in YAML, initialize with an empty map.
+				// This case might be removed if it's guaranteed 'slots' will always be a string reference.
+				finalizedContract.Slots = make(map[string]Slot)
+			default:
+				return fmt.Errorf("unexpected type for 'slots' field in contract '%s' (address: %s, chain: %s): expected a string reference like '${{storage-layouts.LAYOUT_NAME}}', got type %T", rawContract.Name, contractAddr, chainID, rawContract.Slots)
+			}
+			c.Contracts[chainID][contractAddr] = finalizedContract
+		}
+	}
+	return nil
 }
 
 func (g *FileGenerator) BuildValidationFile(safe string, overrides []state.Override, diffs []state.StateDiff, domainHash, messageHash []byte) []byte {
