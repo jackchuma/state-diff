@@ -21,8 +21,8 @@ contracts:
           summary: "Increments the nonce"
           override-meaning: ""
         0xe90b7bceb6e7df5418fb78d8ee546e97c83a08bbccc01a0644d599ccd2a7c2e0:
-          type: "uint256"
-          summary: "Increments the nonce"
+          type: "address"
+          summary: "Sets the head of the owners linked list"
           override-meaning: "This is owners[1] -> 0xca11bde05977b3631167028862be2a173976ca11, so the key can be derived from `cast index address 0x0000000000000000000000000000000000000001 2`."
         0x316a0aac0d94f5824f0b66f5bbe94a8c360a17699a1d3a233aafcf7146e9f11c:
           type: "uint256"
@@ -49,8 +49,8 @@ contracts:
           summary: "Increments the nonce"
           override-meaning: ""
         0xe90b7bceb6e7df5418fb78d8ee546e97c83a08bbccc01a0644d599ccd2a7c2e0:
-          type: "uint256"
-          summary: "Increments the nonce"
+          type: "address"
+          summary: "Sets the head of the owners linked list"
           override-meaning: "This is owners[1] -> 0xca11bde05977b3631167028862be2a173976ca11, so the key can be derived from `cast index address 0x0000000000000000000000000000000000000001 2`."
         0x316a0aac0d94f5824f0b66f5bbe94a8c360a17699a1d3a233aafcf7146e9f11c:
           type: "uint256"
@@ -77,8 +77,8 @@ contracts:
           summary: "Increments the nonce"
           override-meaning: ""
         0xe90b7bceb6e7df5418fb78d8ee546e97c83a08bbccc01a0644d599ccd2a7c2e0:
-          type: "uint256"
-          summary: "Increments the nonce"
+          type: "address"
+          summary: "Sets the head of the owners linked list"
           override-meaning: "This is owners[1] -> 0xca11bde05977b3631167028862be2a173976ca11, so the key can be derived from `cast index address 0x0000000000000000000000000000000000000001 2`."
         0x316a0aac0d94f5824f0b66f5bbe94a8c360a17699a1d3a233aafcf7146e9f11c:
           type: "uint256"
@@ -113,8 +113,8 @@ contracts:
           summary: "Increments the nonce"
           override-meaning: ""
         0xe90b7bceb6e7df5418fb78d8ee546e97c83a08bbccc01a0644d599ccd2a7c2e0:
-          type: "uint256"
-          summary: "Increments the nonce"
+          type: "address"
+          summary: "Sets the head of the owners linked list"
           override-meaning: "This is owners[1] -> 0xca11bde05977b3631167028862be2a173976ca11, so the key can be derived from `cast index address 0x0000000000000000000000000000000000000001 2`."
         0x316a0aac0d94f5824f0b66f5bbe94a8c360a17699a1d3a233aafcf7146e9f11c:
           type: "uint256"
@@ -141,8 +141,40 @@ contracts:
           summary: "Increments the nonce"
           override-meaning: ""
         0xe90b7bceb6e7df5418fb78d8ee546e97c83a08bbccc01a0644d599ccd2a7c2e0:
+          type: "address"
+          summary: "Sets the head of the owners linked list"
+          override-meaning: "This is owners[1] -> 0xca11bde05977b3631167028862be2a173976ca11, so the key can be derived from `cast index address 0x0000000000000000000000000000000000000001 2`."
+        0x316a0aac0d94f5824f0b66f5bbe94a8c360a17699a1d3a233aafcf7146e9f11c:
           type: "uint256"
           summary: "Increments the nonce"
+          override-meaning: "This is owners[0xca11bde05977b3631167028862be2a173976ca11] -> 1, so the key can be derived from `cast index address 0xca11bde05977b3631167028862be2a173976ca11 2`."
+    0x14536667cd30e52c0b458baaccb9fada7046e056:
+      id: "MainnetIncidentSafe"
+      name: "Incident Safe - Mainnet"
+      slots:
+        0x0000000000000000000000000000000000000000000000000000000000000002:
+          type: "address"
+          summary: "Updates the owners mapping"
+          override-meaning: ""
+        0x0000000000000000000000000000000000000000000000000000000000000003:
+          type: "uint256"
+          summary: "Updates the owner count"
+          override-meaning: "Sets the owner count to 1 so the transaction simulation can occur."
+        0x0000000000000000000000000000000000000000000000000000000000000004:
+          type: "uint256"
+          summary: "Updates the execution threshold"
+          override-meaning: "Override the threshold to 1 so the transaction simulation can occur."
+        0x0000000000000000000000000000000000000000000000000000000000000005:
+          type: "uint256"
+          summary: "Increments the nonce"
+          override-meaning: ""
+        0x0000000000000000000000000000000000000000000000000000000000000008:
+          type: "uint256"
+          summary: "Sets an approval for the task"
+          override-meaning: "Simulates an approval from msg.sender in order for the task simulation to succeed."
+        0xe90b7bceb6e7df5418fb78d8ee546e97c83a08bbccc01a0644d599ccd2a7c2e0:
+          type: "address"
+          summary: "Sets the head of the owners linked list"
           override-meaning: "This is owners[1] -> 0xca11bde05977b3631167028862be2a173976ca11, so the key can be derived from `cast index address 0x0000000000000000000000000000000000000001 2`."
         0x316a0aac0d94f5824f0b66f5bbe94a8c360a17699a1d3a233aafcf7146e9f11c:
           type: "uint256"
@@ -195,8 +227,8 @@ contracts:
           summary: "Increments the nonce"
           override-meaning: ""
         0xe90b7bceb6e7df5418fb78d8ee546e97c83a08bbccc01a0644d599ccd2a7c2e0:
-          type: "uint256"
-          summary: "Increments the nonce"
+          type: "address"
+          summary: "Sets the head of the owners linked list"
           override-meaning: "This is owners[1] -> 0xca11bde05977b3631167028862be2a173976ca11, so the key can be derived from `cast index address 0x0000000000000000000000000000000000000001 2`."
         0x316a0aac0d94f5824f0b66f5bbe94a8c360a17699a1d3a233aafcf7146e9f11c:
           type: "uint256"

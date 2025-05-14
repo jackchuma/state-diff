@@ -74,6 +74,10 @@ func NewCachingStateDB(client *ethclient.Client, blockNum *big.Int, db ethdb.Dat
 	}
 }
 
+func (db *CachingStateDB) GetPreimage(h common.Hash) string {
+	return db.preimages[h]
+}
+
 func (db *CachingStateDB) SetOverrides(overrides string) {
 	var decodedOverrides []Override
 	err := json.Unmarshal([]byte(overrides), &decodedOverrides)

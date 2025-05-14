@@ -71,15 +71,34 @@ func parseInput(input []byte, prefix string, suffix string) ([]byte, []byte, str
 	fmt.Printf("Message hash: 0x%s\n", hex.EncodeToString(messageHash))
 
 	tenderlyPrefix := "https://dashboard.tenderly.co"
-	if index := strings.Index(string(rawInput), tenderlyPrefix); index >= 0 {
-		rawInput = rawInput[index:]
+	tenderlyInput := rawInput
+	if index := strings.Index(string(tenderlyInput), tenderlyPrefix); index >= 0 {
+		tenderlyInput = tenderlyInput[index:]
 	}
 	// Find end of url - should be a space or newline
-	if index := strings.IndexAny(string(rawInput), " \n"); index >= 0 {
-		rawInput = rawInput[:index]
+	if index := strings.IndexAny(string(tenderlyInput), " \n"); index >= 0 {
+		tenderlyInput = tenderlyInput[:index]
 	}
 
-	tenderlyLink := strings.TrimSpace(string(rawInput))
+	tenderlyLink := strings.TrimSpace(string(tenderlyInput))
+
+	extraDataPrefix := "Insert the following hex into the 'Raw input data' field:"
+	extraDataInput := rawInput
+	extraDataIndex := strings.Index(string(extraDataInput), extraDataPrefix)
+	if extraDataIndex >= 0 {
+		extraDataInput = extraDataInput[extraDataIndex:]
+		if index := strings.Index(string(extraDataInput), "0x"); index >= 0 {
+			extraDataInput = extraDataInput[index:]
+		}
+
+		// Find end of extra data - should be a space or newline
+		if index := strings.IndexAny(string(extraDataInput), "\n"); index >= 0 {
+			extraDataInput = extraDataInput[:index]
+		}
+
+		tenderlyLink += "&rawFunctionInput=" + string(extraDataInput)
+	}
+
 	fmt.Printf("Tenderly link: %s\n", tenderlyLink)
 
 	return domainHash, messageHash, tenderlyLink, nil

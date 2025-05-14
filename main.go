@@ -92,11 +92,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	validationFile, err := template.BuildValidationFile(chainID.String(), targetSafe, evm.StateDB.(*state.CachingStateDB).GetOverrides(), diffs, domainHash, messageHash)
+	fileGenerator, err := template.NewFileGenerator(evm.StateDB.(*state.CachingStateDB), chainID.String())
 	if err != nil {
-		fmt.Printf("Error building validation file: %v\n", err)
+		fmt.Printf("Error creating file generator: %v\n", err)
 		os.Exit(1)
 	}
+
+	validationFile := fileGenerator.BuildValidationFile(targetSafe, evm.StateDB.(*state.CachingStateDB).GetOverrides(), diffs, domainHash, messageHash)
 
 	if outputFile != "" {
 		err = os.WriteFile(outputFile, validationFile, 0644)

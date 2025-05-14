@@ -85,6 +85,23 @@ You can now navigate back to the [README](../README.md#43-extract-the-domain-has
 
 `
 
+type FileGenerator struct {
+	db       *state.CachingStateDB
+	chainId  string
+	cfg      *Config
+	template []byte
+}
+
+func NewFileGenerator(db *state.CachingStateDB, chainId string) (*FileGenerator, error) {
+	cfg, err := loadConfig()
+	if err != nil {
+		fmt.Printf("Error loading config: %v\n", err)
+		return nil, err
+	}
+	template := starterTemplate
+	return &FileGenerator{db, chainId, cfg, []byte(template)}, nil
+}
+
 func loadConfig() (*Config, error) {
 	// Use the embedded config file content
 	var cfg Config
@@ -97,23 +114,17 @@ func loadConfig() (*Config, error) {
 	return &cfg, nil
 }
 
-func BuildValidationFile(chainId, safe string, overrides []state.Override, diffs []state.StateDiff, domainHash, messageHash []byte) ([]byte, error) {
-	cfg, err := loadConfig()
-	if err != nil {
-		fmt.Printf("Error loading config: %v\n", err)
-		return nil, err
-	}
-
-	template := handleMessageIdentifiers(chainId, safe, domainHash, messageHash, cfg)
-	template = handleStateOverrides(chainId, template, overrides, cfg)
-	template = handleStateChanges(chainId, template, diffs, cfg)
-	return template, nil
+func (g *FileGenerator) BuildValidationFile(safe string, overrides []state.Override, diffs []state.StateDiff, domainHash, messageHash []byte) []byte {
+	g.handleMessageIdentifiers(safe, domainHash, messageHash)
+	g.handleStateOverrides(overrides)
+	g.handleStateChanges(diffs)
+	return g.template
 }
 
-func handleMessageIdentifiers(chainId, safe string, domainHash, messageHash []byte, cfg *Config) []byte {
+func (g *FileGenerator) handleMessageIdentifiers(safe string, domainHash, messageHash []byte) {
 	var messageIdentifiers string
 
-	contract := getContractCfg(cfg, chainId, safe)
+	contract := g.getContractCfg(safe)
 
 	messageIdentifiers += fmt.Sprintf("> ### %s: `%s`\n", contract.Name, safe)
 	messageIdentifiers += ">\n"
@@ -121,10 +132,10 @@ func handleMessageIdentifiers(chainId, safe string, domainHash, messageHash []by
 	messageIdentifiers += fmt.Sprintf("> - Message Hash: `0x%x`\n", messageHash)
 	messageIdentifiers += ">\n"
 
-	return []byte(strings.Replace(starterTemplate, "<<MessageIdentifiers>>", strings.TrimSuffix(messageIdentifiers, "\n>\n"), 1))
+	g.template = []byte(strings.Replace(string(g.template), "<<MessageIdentifiers>>", strings.TrimSuffix(messageIdentifiers, "\n>\n"), 1))
 }
 
-func handleStateOverrides(chainId string, template []byte, overrides []state.Override, cfg *Config) []byte {
+func (g *FileGenerator) handleStateOverrides(overrides []state.Override) {
 	sort.Slice(overrides, func(i, j int) bool {
 		return overrides[i].ContractAddress.String() < overrides[j].ContractAddress.String()
 	})
@@ -133,7 +144,7 @@ func handleStateOverrides(chainId string, template []byte, overrides []state.Ove
 	counter := 0
 
 	for _, override := range overrides {
-		contract := getContractCfg(cfg, chainId, override.ContractAddress.Hex())
+		contract := g.getContractCfg(override.ContractAddress.Hex())
 		stateOverrides += fmt.Sprintf("### %s (`%s`)\n\n", contract.Name, override.ContractAddress.Hex())
 
 		sort.Slice(override.Storage, func(i, j int) bool {
@@ -141,7 +152,7 @@ func handleStateOverrides(chainId string, template []byte, overrides []state.Ove
 		})
 
 		for _, storageOverride := range override.Storage {
-			slot := getSlot(&contract, storageOverride.Key.Hex(), "")
+			slot := g.getSlot(&contract, storageOverride.Key.Hex())
 
 			stateOverrides += fmt.Sprintf("- **Key**: `%s` <br/>\n", storageOverride.Key.Hex())
 			stateOverrides += fmt.Sprintf("  **Override**: `%s` <br/>\n", storageOverride.Value.Hex())
@@ -153,26 +164,24 @@ func handleStateOverrides(chainId string, template []byte, overrides []state.Ove
 
 	stateOverrides = strings.TrimSuffix(stateOverrides, "\n\n")
 
-	template = []byte(strings.Replace(string(template), "<<StateOverrides>>", stateOverrides, 1))
+	g.template = []byte(strings.Replace(string(g.template), "<<StateOverrides>>", stateOverrides, 1))
 
 	if counter > 0 {
-		template = []byte(strings.Replace(string(template), "<<StartStateOverrides>>\n\n", "", 1))
-		template = []byte(strings.Replace(string(template), "<<EndStateOverrides>>\n\n", "", 1))
+		g.template = []byte(strings.Replace(string(g.template), "<<StartStateOverrides>>\n\n", "", 1))
+		g.template = []byte(strings.Replace(string(g.template), "<<EndStateOverrides>>\n\n", "", 1))
 	} else {
 		// remove everything between <<StartStateOverrides>> and <<EndStateOverrides>>
 		startKey := "<<StartStateOverrides>>\n\n"
 		endKey := "<<EndStateOverrides>>\n\n"
 
-		startIdx := strings.Index(string(template), startKey)
-		endIdx := strings.Index(string(template), endKey)
+		startIdx := strings.Index(string(g.template), startKey)
+		endIdx := strings.Index(string(g.template), endKey)
 
-		template = append(template[:startIdx], template[endIdx+len(endKey):]...)
+		g.template = append(g.template[:startIdx], g.template[endIdx+len(endKey):]...)
 	}
-
-	return template
 }
 
-func handleStateChanges(chainId string, template []byte, changes []state.StateDiff, cfg *Config) []byte {
+func (g *FileGenerator) handleStateChanges(changes []state.StateDiff) {
 	sort.Slice(changes, func(i, j int) bool {
 		return changes[i].Address.String() < changes[j].Address.String()
 	})
@@ -181,7 +190,7 @@ func handleStateChanges(chainId string, template []byte, changes []state.StateDi
 	ctr := 0
 
 	for _, change := range changes {
-		contract := getContractCfg(cfg, chainId, change.Address.String())
+		contract := g.getContractCfg(change.Address.String())
 
 		storageDiffs := []state.StorageDiff{}
 		for _, diff := range change.StorageDiffs {
@@ -197,7 +206,7 @@ func handleStateChanges(chainId string, template []byte, changes []state.StateDi
 		})
 
 		for _, diff := range storageDiffs {
-			slot := getSlot(&contract, diff.Key.String(), diff.Preimage)
+			slot := g.getSlot(&contract, diff.Key.String())
 
 			if diff.ValueBefore == diff.ValueAfter {
 				continue
@@ -220,19 +229,17 @@ func handleStateChanges(chainId string, template []byte, changes []state.StateDi
 	stateChanges = strings.TrimSuffix(stateChanges, "\n\n")
 
 	// Replace the placeholder in the template
-	template = []byte(strings.Replace(string(template), "<<StateChanges>>", stateChanges, 1))
+	g.template = []byte(strings.Replace(string(g.template), "<<StateChanges>>", stateChanges, 1))
 
 	// Remove the <<StartStateChanges>> placeholder and the following line
-	template = []byte(strings.Replace(string(template), "<<StartStateChanges>>\n\n", "", 1))
-	template = []byte(strings.Replace(string(template), "<<EndStateChanges>>\n\n", "", 1))
+	g.template = []byte(strings.Replace(string(g.template), "<<StartStateChanges>>\n\n", "", 1))
+	g.template = []byte(strings.Replace(string(g.template), "<<EndStateChanges>>\n\n", "", 1))
 
-	template = []byte(strings.TrimSuffix(string(template), "\n"))
-
-	return template
+	g.template = []byte(strings.TrimSuffix(string(g.template), "\n"))
 }
 
-func getContractCfg(cfg *Config, chainId string, address string) Contract {
-	contract, ok := cfg.Contracts[chainId][strings.ToLower(address)]
+func (g *FileGenerator) getContractCfg(address string) Contract {
+	contract, ok := g.cfg.Contracts[g.chainId][strings.ToLower(address)]
 	if !ok {
 		return DEFAULT_CONTRACT
 	}
@@ -240,21 +247,26 @@ func getContractCfg(cfg *Config, chainId string, address string) Contract {
 	return contract
 }
 
-func getSlot(cfg *Contract, slot, preimage string) Slot {
+func (g *FileGenerator) getSlot(cfg *Contract, slot string) Slot {
 	slotType, ok := cfg.Slots[strings.ToLower(slot)]
-	if !ok {
-		// If key not recognized as slot, attempt to parse preimage
-		if len(preimage) != 128 {
-			return DEFAULT_SLOT
-		}
 
-		slotType, ok = cfg.Slots["0x"+strings.ToLower(preimage[64:])]
-		if !ok {
-			return DEFAULT_SLOT
-		}
+	if ok {
+		return slotType
 	}
 
-	return slotType
+	for {
+		slot = g.db.GetPreimage(common.HexToHash(slot))
+
+		// If key not recognized as slot, attempt to parse preimage
+		if len(slot) != 128 {
+			return DEFAULT_SLOT
+		}
+
+		slotType, ok = cfg.Slots["0x"+strings.ToLower(slot[64:])]
+		if ok {
+			return slotType
+		}
+	}
 }
 
 func getDecodedValue(slotType string, value string) string {
