@@ -34,6 +34,9 @@ contracts:
     0xf272670eb55e895584501d564afeb048bed26194:
       name: "System Config - Sepolia"
       slots: ${{storage-layouts.system-config}}
+    0x5dfeb066334b67355a15dc9b67317fd2a2e1f77f:
+      name: "CB Signer Safe - Sepolia"
+      slots: ${{storage-layouts.gnosis-safe}}
   8453:
     0xd94e416cf2c7167608b2515b7e4102b41efff94f:
       name: "CB Signer Safe - Base Mainnet"
