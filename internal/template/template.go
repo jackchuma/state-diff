@@ -20,7 +20,6 @@ type Slot struct {
 }
 
 type Contract struct {
-	ID    string          `yaml:"id,omitempty"`
 	Name  string          `yaml:"name"`
 	Slots map[string]Slot `yaml:"slots"`
 }
@@ -30,7 +29,7 @@ type Config struct {
 	StorageLayouts map[string]map[string]Slot     `yaml:"storage-layouts"`
 }
 
-var DEFAULT_CONTRACT = Contract{ID: "<<DefaultContractID>>", Name: "<<ContractName>>", Slots: map[string]Slot{}}
+var DEFAULT_CONTRACT = Contract{Name: "<<ContractName>>", Slots: map[string]Slot{}}
 var DEFAULT_SLOT = Slot{Type: "<<DecodedKind>>", Summary: "<<Summary>>", OverrideMeaning: "<<OverrideMeaning>>"}
 
 var starterTemplate = `# Validation
@@ -124,7 +123,6 @@ func loadConfig() (*Config, error) {
 func (c *Config) UnmarshalYAML() error {
 	// Define auxiliary types to handle the flexible 'slots' field during initial parsing.
 	type auxContractDefinition struct {
-		ID    string `yaml:"id"`
 		Name  string `yaml:"name"`
 		Slots any    `yaml:"slots"` // Slots can be a map or a string reference
 	}
@@ -145,7 +143,6 @@ func (c *Config) UnmarshalYAML() error {
 		c.Contracts[chainID] = make(map[string]Contract)
 		for contractAddr, rawContract := range contractAddressesMap {
 			finalizedContract := Contract{
-				ID:   rawContract.ID,
 				Name: rawContract.Name,
 			}
 
