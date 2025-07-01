@@ -7,9 +7,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/0xekkila/state-diff/config"
-	"github.com/0xekkila/state-diff/internal/state"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/jackchuma/state-diff/config"
+	"github.com/jackchuma/state-diff/internal/state"
 	"gopkg.in/yaml.v2"
 )
 

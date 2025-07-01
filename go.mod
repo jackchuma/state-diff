@@ -1,4 +1,4 @@
-module github.com/0xekkila/state-diff
+module github.com/jackchuma/state-diff
 
 go 1.23.0
 
