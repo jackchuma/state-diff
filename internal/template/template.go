@@ -7,9 +7,9 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/0xekkila/state-diff/config"
+	"github.com/0xekkila/state-diff/internal/state"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/jackchuma/state-diff/config"
-	"github.com/jackchuma/state-diff/internal/state"
 	"gopkg.in/yaml.v2"
 )
 
@@ -177,6 +177,107 @@ func (g *FileGenerator) BuildValidationFile(safe string, overrides []state.Overr
 	g.handleStateOverrides(overrides)
 	g.handleStateChanges(diffs)
 	return g.template
+}
+
+// BuildValidationJSON creates a JSON representation of the validation data
+func (g *FileGenerator) BuildValidationJSON(safe string, overrides []state.Override, diffs []state.StateDiff, domainHash, messageHash []byte) (*ValidationResult, error) {
+	result := &ValidationResult{
+		DomainHash:     fmt.Sprintf("0x%x", domainHash),
+		MessageHash:    fmt.Sprintf("0x%x", messageHash),
+		TargetSafe:     safe,
+		StateOverrides: g.convertOverridesToJSON(overrides),
+		StateChanges:   g.convertDiffsToJSON(diffs),
+	}
+	return result, nil
+}
+
+// convertOverridesToJSON converts state overrides to JSON format
+func (g *FileGenerator) convertOverridesToJSON(overrides []state.Override) []StateOverride {
+	result := make([]StateOverride, 0, len(overrides))
+
+	// Sort overrides by address
+	sort.Slice(overrides, func(i, j int) bool {
+		return overrides[i].ContractAddress.String() < overrides[j].ContractAddress.String()
+	})
+
+	for _, override := range overrides {
+		contract := g.getContractCfg(override.ContractAddress.Hex())
+		jsonOverrides := make([]Override, 0, len(override.Storage))
+
+		// Sort storage overrides by key
+		sort.Slice(override.Storage, func(i, j int) bool {
+			return override.Storage[i].Key.String() < override.Storage[j].Key.String()
+		})
+
+		for _, storageOverride := range override.Storage {
+			slot := g.getSlot(&contract, storageOverride.Key.Hex())
+			jsonOverrides = append(jsonOverrides, Override{
+				Key:         storageOverride.Key.Hex(),
+				Value:       storageOverride.Value.Hex(),
+				Description: slot.OverrideMeaning,
+			})
+		}
+
+		result = append(result, StateOverride{
+			Name:      contract.Name,
+			Address:   override.ContractAddress.Hex(),
+			Overrides: jsonOverrides,
+		})
+	}
+
+	return result
+}
+
+// convertDiffsToJSON converts state diffs to JSON format
+func (g *FileGenerator) convertDiffsToJSON(diffs []state.StateDiff) []StateChange {
+	result := make([]StateChange, 0, len(diffs))
+
+	// Sort diffs by address
+	sort.Slice(diffs, func(i, j int) bool {
+		return diffs[i].Address.String() < diffs[j].Address.String()
+	})
+
+	for _, diff := range diffs {
+		contract := g.getContractCfg(diff.Address.String())
+		jsonChanges := make([]Change, 0)
+
+		// Convert storage diffs to slice for sorting
+		storageDiffs := make([]state.StorageDiff, 0, len(diff.StorageDiffs))
+		for _, storageDiff := range diff.StorageDiffs {
+			storageDiffs = append(storageDiffs, storageDiff)
+		}
+
+		// Sort storage diffs by key
+		sort.Slice(storageDiffs, func(i, j int) bool {
+			return storageDiffs[i].Key.String() < storageDiffs[j].Key.String()
+		})
+
+		for _, storageDiff := range storageDiffs {
+			// Skip if no actual change
+			if storageDiff.ValueBefore == storageDiff.ValueAfter {
+				continue
+			}
+
+			slot := g.getSlot(&contract, storageDiff.Key.String())
+			jsonChanges = append(jsonChanges, Change{
+				Key:         storageDiff.Key.Hex(),
+				Before:      storageDiff.ValueBefore.Hex(),
+				After:       storageDiff.ValueAfter.Hex(),
+				Description: slot.Summary,
+			})
+		}
+
+		// Only add if there are actual changes
+		if len(jsonChanges) > 0 {
+			result = append(result, StateChange{
+				Name:    contract.Name,
+				Address: diff.Address.Hex(),
+				Changes: jsonChanges,
+			})
+		}
+	}
+
+	return result
 }
 
 func (g *FileGenerator) handleMessageIdentifiers(safe string, domainHash, messageHash []byte) {
