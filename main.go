@@ -27,7 +27,6 @@ func main() {
 	var rpcURL string
 	var outputFile string
 	var outputFormat string
-
 	// New flags for pre-extracted data
 	var useExtractedData bool
 	var signingData string
@@ -35,7 +34,7 @@ func main() {
 	var stateOverrides string
 	var rawFunctionInput string
 	var senderAddress string
-	var networkID string
+		var networkID string
 	var contractAddress string
 
 	flag.StringVar(&prefix, "prefix", "vvvvvvvv", "String that prefixes the data to be signed")
@@ -43,7 +42,7 @@ func main() {
 	flag.StringVar(&workdir, "workdir", ".", "Directory in which to run the subprocess")
 	flag.StringVar(&rpcURL, "rpc", "", "RPC URL to connect to")
 	flag.StringVar(&outputFile, "o", "", "Output file path")
-	flag.StringVar(&outputFormat, "format", "markdown", "Output format: markdown or json")
+	flag.StringVar(&outputFormat, "format", "tool", "Output format: tool (for TypeScript compatibility) or json (base-nested.json format with empty metadata fields)")
 
 	// New flags for extracted data
 	flag.BoolVar(&useExtractedData, "use-extracted", false, "Use pre-extracted data instead of running script")
@@ -52,7 +51,7 @@ func main() {
 	flag.StringVar(&stateOverrides, "state-overrides", "", "State overrides JSON (optional)")
 	flag.StringVar(&rawFunctionInput, "raw-input", "", "Raw function input (optional)")
 	flag.StringVar(&senderAddress, "sender", "", "Sender address for simulation")
-	flag.StringVar(&networkID, "network", "", "Network ID (optional)")
+		flag.StringVar(&networkID, "network", "", "Network ID (optional)")
 	flag.StringVar(&contractAddress, "contract", "", "Contract address (optional)")
 
 	flag.Parse()
@@ -112,21 +111,12 @@ func main() {
 			m.Set("rawFunctionInput", rawFunctionInput)
 		}
 
-		// Print debug info to stderr in JSON mode to keep stdout clean for JSON
-		if outputFormat == "json" {
-			fmt.Fprintf(os.Stderr, "Using pre-extracted data:\n")
-			fmt.Fprintf(os.Stderr, "Domain hash: 0x%s\n", hex.EncodeToString(domainHash))
-			fmt.Fprintf(os.Stderr, "Message hash: 0x%s\n", hex.EncodeToString(messageHash))
-			if finalTenderlyLink != "" {
-				fmt.Fprintf(os.Stderr, "Tenderly link: %s\n", finalTenderlyLink)
-			}
-		} else {
-			fmt.Printf("Using pre-extracted data:\n")
-			fmt.Printf("Domain hash: 0x%s\n", hex.EncodeToString(domainHash))
-			fmt.Printf("Message hash: 0x%s\n", hex.EncodeToString(messageHash))
-			if finalTenderlyLink != "" {
-				fmt.Printf("Tenderly link: %s\n", finalTenderlyLink)
-			}
+		// Print debug info to stderr to keep stdout clean for JSON
+		fmt.Fprintf(os.Stderr, "Using pre-extracted data:\n")
+		fmt.Fprintf(os.Stderr, "Domain hash: 0x%s\n", hex.EncodeToString(domainHash))
+		fmt.Fprintf(os.Stderr, "Message hash: 0x%s\n", hex.EncodeToString(messageHash))
+		if finalTenderlyLink != "" {
+			fmt.Fprintf(os.Stderr, "Tenderly link: %s\n", finalTenderlyLink)
 		}
 	} else {
 		// Original behavior: run script to extract data
@@ -175,12 +165,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Print success message to stderr in JSON mode to keep stdout clean for JSON
-	if outputFormat == "json" {
-		fmt.Fprintf(os.Stderr, "Transaction simulated successfully on chain %d at block %d\n", chainID.Int64(), evm.Context.BlockNumber.Int64())
-	} else {
-		fmt.Printf("Transaction simulated successfully on chain %d at block %d\n", chainID.Int64(), evm.Context.BlockNumber.Int64())
-	}
+	// Print success message to stderr to keep stdout clean for JSON
+	fmt.Fprintf(os.Stderr, "Transaction simulated successfully on chain %d at block %d\n", chainID.Int64(), evm.Context.BlockNumber.Int64())
 
 	targetSafe, err := transaction.GetTargetedSafe(tx)
 	if err != nil {
@@ -195,9 +181,9 @@ func main() {
 	}
 
 	// Generate output based on format
-	if outputFormat == "json" {
-		// Generate JSON output
-		jsonResult, err := fileGenerator.BuildValidationJSON(targetSafe, evm.StateDB.(*state.CachingStateDB).GetOverrides(), diffs, domainHash, messageHash)
+	if outputFormat == "tool" {
+		// Generate JSON output for TypeScript tool compatibility
+		jsonResult, err := fileGenerator.BuildValidationJSONForTool(targetSafe, evm.StateDB.(*state.CachingStateDB).GetOverrides(), diffs, domainHash, messageHash)
 		if err != nil {
 			fmt.Printf("Error generating JSON: %v\n", err)
 			os.Exit(1)
@@ -218,19 +204,32 @@ func main() {
 		} else {
 			fmt.Println(string(jsonBytes))
 		}
-	} else {
-		// Generate markdown output (existing functionality)
-		validationFile := fileGenerator.BuildValidationFile(targetSafe, evm.StateDB.(*state.CachingStateDB).GetOverrides(), diffs, domainHash, messageHash)
+	} else if outputFormat == "json" {
+		// Generate JSON output in base-nested.json format
+		jsonResult, err := fileGenerator.BuildValidationJSON("", "", "", "", targetSafe, evm.StateDB.(*state.CachingStateDB).GetOverrides(), diffs, domainHash, messageHash)
+		if err != nil {
+			fmt.Printf("Error generating formatted JSON: %v\n", err)
+			os.Exit(1)
+		}
+
+		jsonBytes, err := json.MarshalIndent(jsonResult, "", "  ")
+		if err != nil {
+			fmt.Printf("Error marshaling formatted JSON: %v\n", err)
+			os.Exit(1)
+		}
 
 		if outputFile != "" {
-			err = os.WriteFile(outputFile, validationFile, 0644)
+			err = os.WriteFile(outputFile, jsonBytes, 0644)
 			if err != nil {
-				fmt.Println("Error writing file:", err)
+				fmt.Println("Error writing formatted JSON file:", err)
 				return
 			}
 		} else {
-			fmt.Println(string(validationFile))
+			fmt.Println(string(jsonBytes))
 		}
+	} else {
+		fmt.Printf("Error: Invalid output format '%s'. Use 'tool' or 'json'\n", outputFormat)
+		os.Exit(1)
 	}
 }
 
